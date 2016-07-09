@@ -1,43 +1,53 @@
-'use strict'
-
 var express = require('express');
-var path = require('path')
-var bodyParser = require('body-parser')
-var session = require('express-session')
+var bodyParser = require('body-parser');
+var bookRoute = require('./api/books');
+var session = require('express-session');
 var app = express();
 
-// serve static files
-app.use('/files', express.static(__dirname + '/public/static/'))
+app.use('/files', express.static('public/static'))
 
-// use body parser middleeware
-app.use(bodyParser.urlencoded({ extended: true }))
-app.use(bodyParser.json())
+app.use(bodyParser.urlencoded({ extended: true }));
+app.use(bodyParser.json());
 
-// use sessions
-app.use(session({
-  secret: 'keyboard cat',
-  resave: false,
-  saveUninitialized: true
-}))
+app.use('/api/books', bookRoute);
 
-// setting api routes
-app.use('/api', require('./routes/api.router.js'))
-
-// handle internal server errors
-app.use('/broken', function (req, res, next) {
+app.get('/broken', function(req, res, next){
   res.sendStatus(500)
 })
 
-// throw custom error
-app.use('/forbidden', function (req, res, next) {
-  let err = new Error('You Shall Not Pass!!')
-  err.status = 403
-  next(err)
+app.get('/forbidden', function(req, res, next){
+  res.sendStatus(403)
 })
 
-// handle custom errors
-app.use(function (err, req, res, next) {
-  res.sendStatus(err.status || 500)
+app.use(session({
+  genid: function(req) {
+    return req.headers.host // use UUIDs for session IDs
+  },
+  // secret: 'dougFunny',
+  cookie: {},
+  secret: 'dougFunny'
+  // resave: false,
+  // saveUninitialized: true
+}))
+
+app.get('/api/numVisits', function(req, res, next){
+  var views = req.session.views
+
+  if (!views) {
+    views = req.session.views = {}
+    views[req.sessionID] = 0;
+  } else {
+    views[req.sessionID]++
+  }
+
+  var resData = {number: views[req.sessionID]}
+  res.status(200).send(resData)
+})
+
+
+
+app.use(function(err, req, res, next){
+  res.status(err.status || 500).end();
 })
 
 module.exports = app;
